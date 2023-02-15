@@ -1,0 +1,95 @@
+---
+title: "gt-table"
+author: "Jarred Robidoux"
+date: "2/14/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# __Introduction__
+This walkthrough will decipher how to utilize the **gt** library in R to make
+tables for data visualization. 
+
+# __Load required libraries__
+```{r}
+# install.packages("tidyverse")
+library(tidyverse)
+# install.packages("dplyr")
+library(dplyr)
+# install.packages("rvest")
+library(rvest)
+# install.packages("gt")
+library(gt)
+# install.packages("janitor")
+library(janitor)
+```
+# __Scrape data from BasketballReference.com__
+Data for this table will be provided from www.basketballreference.com
+```{r}
+# Upload the link
+link <- "https://www.basketball-reference.com/leagues/NBA_2023_per_game.html"
+
+full_table <- read_html(link, as.data.frame = T, stringsAsFactors = T)
+
+# html_nodes to pull all nodes under the table label 
+per_game <- full_table %>%
+  html_nodes("table") %>%
+  .[[1]] %>%
+  html_table(fill = T)
+```
+
+# __Manipulate Data__
+Before we create the table, we need to make changes to our dataset so that our table
+can be easily readable. One of the first changes we have to make is to turn almost 
+all of our values into numeric class instead of character. If this is not done, the 
+data cannot be properly manipulated 
+```{r}
+per_game$PTS <- as.numeric(per_game$PTS)
+per_game$AST <- as.numeric(per_game$AST)
+per_game$`FG%` <- as.numeric(per_game$`FG%`)
+per_game$FGA <- as.numeric(per_game$FGA)
+per_game$`3P%` <- as.numeric(per_game$`3P%`)
+per_game$`3PA` <- as.numeric(per_game$`3PA`)
+
+per_game$`FG%` <-  per_game$`FG%` * 100
+per_game$`3P%` <-  per_game$`3P%` * 100
+```
+Now we can use tidyverse to manipulate our data frame in order to make the 
+table easier. 
+```{r}
+table_data <- per_game %>%
+  select(Player, Pos, Tm, `FG%`, FGA, `3P%`, `3PA`, PTS) %>%
+  arrange(desc(PTS)) %>%
+  head(7)
+```
+
+# __Create Table__
+```{r}
+table_data %>%
+  gt(rowname_col = "Player") %>%
+  tab_header(
+    title = md("**The League's Best Scorers**"),
+    subtitle = md("`Players averaging 30+ PPG this season`")
+  ) %>%
+  fmt_number(columns = c("FGA", "FG%", "3P%", "3PA", "PTS"), decimals = 1)%>%
+  cols_width(
+    Pos ~ px(50),
+    Tm ~ px(50),
+    `FG%` ~ px(75),
+    FGA ~ px(75),
+    `3P%` ~ px(75),
+    `3PA` ~ px(75),
+    PTS ~ px(75)
+  ) %>%
+  tab_source_note(
+    source_note = md("**Data : BasketballReference.com**")
+  ) %>%
+  tab_footnote(
+    footnote = "Smallest Player averaging 30+ PPG (6'5)",
+    locations = cells_stub(rows = "Shai Gilgeous-Alexander")) %>%
+      opt_footnote_marks(marks = c("*", "**", "***"))
+```
+
